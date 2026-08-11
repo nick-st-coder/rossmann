@@ -1,0 +1,1 @@
+This project's goal is to predict item sales in store called Rossmann
