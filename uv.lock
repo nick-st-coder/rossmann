@@ -1975,6 +1975,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "scikit-learn" },
+    { name = "seaborn" },
     { name = "uvicorn" },
 ]
 
@@ -2008,6 +2009,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.13.4" },
     { name = "python-dotenv", specifier = "==1.2.2" },
     { name = "scikit-learn", specifier = "==1.9.0" },
+    { name = "seaborn", specifier = ">=0.13.2" },
     { name = "uvicorn", specifier = "==0.52.1" },
 ]
 

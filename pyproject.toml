@@ -15,19 +15,16 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi[standard]==0.141.1",
     "uvicorn==0.52.1",
-
     "gradio==6.21.0",
-
     "mlflow==3.14.0",
     "numpy==2.4.6",
     "pandas==2.3.3",
     "scikit-learn==1.9.0",
     "lightgbm==4.6.0",
-
     "pydantic==2.13.4",
     "python-dotenv==1.2.2",
-
     "joblib==1.5.3",
+    "seaborn>=0.13.2",
 ]
 
 [dependency-groups]
