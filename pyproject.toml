@@ -25,6 +25,7 @@ dependencies = [
     "python-dotenv==1.2.2",
     "joblib==1.5.3",
     "seaborn>=0.13.2",
+    "statsmodels>=0.14.6",
 ]
 
 [dependency-groups]
