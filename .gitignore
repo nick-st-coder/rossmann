@@ -20,6 +20,9 @@ app/__pycache__
 */agents/
 */instructions/
 */agents-documentation/
+*/skills/
+*/workflows/
+.github/
 
 #Docker
 docker/
