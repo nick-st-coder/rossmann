@@ -1,3 +1,3 @@
-from . import evaluation, features, models, tracking
+from . import data, evaluation, features, models, tracking, utils
 
-__all__ = ["evaluation", "features", "models", "tracking"]
+__all__ = ["data", "evaluation", "features", "models", "tracking", "utils"]
