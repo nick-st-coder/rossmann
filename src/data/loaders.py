@@ -14,6 +14,17 @@ import pandas as pd
 # Columns that are one-hot encoded from categorical features.
 CATEGORICAL_COLS = ["StateHoliday", "StoreType", "Assortment", "PromoInterval"]
 
+# Target and date columns are never model features.
+TARGET_COL = "Sales"
+DATE_COL = "Date"
+
+# Columns excluded from the feature set:
+# - ``Customers`` is a same-day count that is nearly identical to ``Sales``
+#   (target leakage) and is not known at prediction time.
+# - ``Open`` is handled by the two-stage split: ``Open == 0`` implies
+#   ``Sales == 0`` deterministically, so the regressor only sees open rows.
+LEAKAGE_COLS = ["Customers", "Open"]
+
 # Columns dropped after deriving competition-age features.
 _COMPETITION_DATE_COLS = ["CompetitionOpenSinceMonth", "CompetitionOpenSinceYear"]
 
@@ -126,6 +137,25 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = _add_time_features(df)
     df = _add_lag_features(df)
     return _encode_categoricals(df)
+
+
+def feature_columns(df: pd.DataFrame) -> list[str]:
+    """Return the model feature columns for a processed DataFrame.
+
+    Excludes the target, date, and leakage columns (``Customers``, ``Open``)
+    so the same feature set is used for training and serving.
+
+    Args:
+        df: Processed DataFrame.
+
+    Returns:
+        Ordered list of feature column names.
+    """
+    return [
+        col
+        for col in df.columns
+        if col not in {TARGET_COL, DATE_COL, *LEAKAGE_COLS}
+    ]
 
 
 def load_processed(data_dir: str | Path) -> pd.DataFrame:

@@ -52,3 +52,26 @@ def split_features_target(
     X = df.drop(columns=[target_col, date_col])
     y = df[target_col]
     return X, y
+
+
+def split_open_closed(
+    df: pd.DataFrame,
+    open_col: str = "Open",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split a processed DataFrame into open and closed store rows.
+
+    ``Open == 0`` implies ``Sales == 0`` deterministically, so the sales
+    regressor is trained only on open rows and closed rows are predicted as
+    zero. This is the two-stage modeling split.
+
+    Args:
+        df: Processed DataFrame.
+        open_col: Name of the ``Open`` indicator column.
+
+    Returns:
+        ``(open_df, closed_df)`` where ``open_df`` has ``Open == 1`` and
+        ``closed_df`` has ``Open == 0``.
+    """
+    open_df = df[df[open_col] == 1].copy()
+    closed_df = df[df[open_col] == 0].copy()
+    return open_df, closed_df
