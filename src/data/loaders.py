@@ -20,10 +20,13 @@ DATE_COL = "Date"
 
 # Columns excluded from the feature set:
 # - ``Customers`` is a same-day count that is nearly identical to ``Sales``
-#   (target leakage) and is not known at prediction time.
-# - ``Open`` is handled by the two-stage split: ``Open == 0`` implies
-#   ``Sales == 0`` deterministically, so the regressor only sees open rows.
-LEAKAGE_COLS = ["Customers", "Open"]
+#   (target leakage) and is not known at prediction time. It is dropped in
+#   cleaning so the dataset is final before modeling.
+# - ``Open`` is not a regressor feature: ``Open == 0`` implies ``Sales == 0``
+#   deterministically, so the two-stage split uses it to predict closed rows
+#   as zero. It stays in the dataset as a split column only.
+LEAKAGE_COLS = ["Customers"]
+SPLIT_COLS = ["Open"]
 
 # Columns dropped after deriving competition-age features.
 _COMPETITION_DATE_COLS = ["CompetitionOpenSinceMonth", "CompetitionOpenSinceYear"]
@@ -142,8 +145,8 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 def feature_columns(df: pd.DataFrame) -> list[str]:
     """Return the model feature columns for a processed DataFrame.
 
-    Excludes the target, date, and leakage columns (``Customers``, ``Open``)
-    so the same feature set is used for training and serving.
+    Excludes the target, date, leakage (``Customers``), and split (``Open``)
+    columns so the same feature set is used for training and serving.
 
     Args:
         df: Processed DataFrame.
@@ -151,11 +154,25 @@ def feature_columns(df: pd.DataFrame) -> list[str]:
     Returns:
         Ordered list of feature column names.
     """
-    return [
-        col
-        for col in df.columns
-        if col not in {TARGET_COL, DATE_COL, *LEAKAGE_COLS}
-    ]
+    excluded = {TARGET_COL, DATE_COL, *LEAKAGE_COLS, *SPLIT_COLS}
+    return [col for col in df.columns if col not in excluded]
+
+
+def drop_leakage(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop target-leakage columns from a processed DataFrame.
+
+    ``Customers`` is a same-day count that is nearly identical to ``Sales``
+    (log-space correlation ~0.996) and is not known at prediction time, so it
+    must not reach the model. This is applied in cleaning so the dataset is
+    final before modeling.
+
+    Args:
+        df: Processed DataFrame.
+
+    Returns:
+        DataFrame without the leakage columns.
+    """
+    return df.drop(columns=[col for col in LEAKAGE_COLS if col in df.columns])
 
 
 def load_processed(data_dir: str | Path) -> pd.DataFrame:
