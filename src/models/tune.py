@@ -51,7 +51,7 @@ _PARAM_FN: dict[str, Callable[[optuna.Trial], dict[str, Any]]] = {
 def tune(
     X: pd.DataFrame,
     y: pd.Series,
-    model_name: str = "lightgbm",
+    model_name: str = "xgboost",
     n_trials: int = 30,
     n_splits: int = 5,
     gap: int = 7,

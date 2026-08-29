@@ -111,7 +111,7 @@ def predict_two_stage(
 def train_model(
     X_train: pd.DataFrame,
     y_train: pd.Series,
-    model_name: str = "lightgbm",
+    model_name: str = "xgboost",
     **params: Any,
 ) -> BaseEstimator:
     """Fit a model on the full training set.
