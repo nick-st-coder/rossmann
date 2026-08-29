@@ -90,14 +90,12 @@ def _add_competition_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _add_time_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Add calendar-derived features from the ``Date`` column."""
+    # Add calendar-derived features from the ``Date`` column.
     df = df.copy()
     df["year"] = df["Date"].dt.year
     df["month"] = df["Date"].dt.month
     df["day"] = df["Date"].dt.day
     df["week_of_year"] = df["Date"].dt.isocalendar().week.astype(int)
-    df["is_Saturday"] = (df["DayOfWeek"] == 6).astype(int)
-    df["is_Sunday"] = (df["DayOfWeek"] == 7).astype(int)
     return df
 
 
