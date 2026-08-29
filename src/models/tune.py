@@ -15,6 +15,36 @@ import pandas as pd
 from src.models import train
 
 
+def time_slice_sample(
+    df: pd.DataFrame,
+    date_col: str = "Date",
+    end_date: str | None = None,
+    frac: float | None = None,
+) -> pd.DataFrame:
+    """Sample a representative training slice for fast tuning.
+
+    Two strategies, pick one:
+
+    - ``end_date``: keep all stores but only rows before this date. This
+      preserves store heterogeneity (all 1115 stores) while cutting rows.
+    - ``frac``: keep a random fraction of rows (all stores, all dates).
+
+    Args:
+        df: Processed DataFrame (open-store rows).
+        date_col: Name of the date column.
+        end_date: ISO date; rows before it are kept (all stores).
+        frac: Fraction of rows to keep (random sample).
+
+    Returns:
+        A sampled DataFrame.
+    """
+    if end_date is not None:
+        return df[df[date_col] < end_date].copy()
+    if frac is not None:
+        return df.sample(frac=frac, random_state=42).copy()
+    raise ValueError("Provide either end_date or frac.")
+
+
 def _lgbm_params(trial: optuna.Trial) -> dict[str, Any]:
     """Sample LightGBM hyperparameters from the search space."""
     return {
@@ -56,6 +86,8 @@ def tune(
     n_splits: int = 5,
     gap: int = 7,
     random_state: int = 42,
+    pruner: optuna.pruners.BasePruner | None = None,
+    log_to_mlflow: bool = False,
 ) -> optuna.Study:
     """Run an Optuna study for the given model family.
 
@@ -66,6 +98,10 @@ def tune(
         n_trials: Number of Optuna trials.
         n_splits / gap: Time-series CV configuration.
         random_state: Seed for reproducible sampling.
+        pruner: Optional Optuna pruner (e.g. ``MedianPruner``) to kill
+            clearly-bad trials early.
+        log_to_mlflow: If True, log each trial as a nested run under the
+            active MLflow run (params, CV score, pruned/completed status).
 
     Raises:
         ValueError: If ``model_name`` has no search-space function.
@@ -81,11 +117,22 @@ def tune(
     def _objective(trial: optuna.Trial) -> float:
         model = train.make_model(model_name, **param_fn(trial))
         scores = train.cross_validate(model, X, y, n_splits=n_splits, gap=gap)
-        return float(scores["RMSLE"].mean())
+        score = float(scores["RMSLE"].mean())
+
+        if log_to_mlflow:
+            import mlflow
+
+            with mlflow.start_run(nested=True, run_name=f"trial_{trial.number}"):
+                mlflow.log_params(trial.params)
+                mlflow.log_metric("cv_RMSLE", score)
+                mlflow.log_metric("cv_MAE", float(scores["MAE"].mean()))
+                mlflow.log_metric("cv_RMSE", float(scores["RMSE"].mean()))
+        return score
 
     study = optuna.create_study(
         direction="minimize",
         sampler=optuna.samplers.TPESampler(seed=random_state),
+        pruner=pruner or optuna.pruners.MedianPruner(n_startup_trials=5),
     )
     study.optimize(_objective, n_trials=n_trials)
     return study
