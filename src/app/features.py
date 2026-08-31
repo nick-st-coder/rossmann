@@ -1,0 +1,219 @@
+"""Feature builder for the serving app.
+
+Turns raw, human-friendly inputs (store id, date, store type, promo flags,
+etc.) into the 41-feature vector the model expects. Store aggregates and
+lag features are computed from the historical dataset, mirroring the
+training pipeline in ``src/data/loaders.py``.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from src.data.loaders import (
+    _add_competition_features,
+    _add_payday_feature,
+    _add_promo2_features,
+    _add_time_features,
+    _encode_categoricals,
+)
+
+logger = logging.getLogger(__name__)
+
+DATA_PATH = Path("data/processed/rossmann.csv")
+RAW_TRAIN_PATH = Path("data/raw/train.csv")
+RAW_STORE_PATH = Path("data/raw/store.csv")
+
+STORE_TYPES = ["a", "b", "c", "d"]
+ASSORTMENTS = ["a", "b", "c"]
+STATE_HOLIDAYS = ["0", "a", "b", "c"]
+PROMO_INTERVALS = ["None", "Jan,Apr,Jul,Oct", "Feb,May,Aug,Nov", "Mar,Jun,Sept,Dec"]
+
+# Expected model feature columns, set from the model signature at startup.
+FEATURE_COLUMNS: list[str] = []
+
+_HISTORY: pd.DataFrame | None = None
+_STORE_MEAN: pd.Series | None = None
+_STORE_MEAN_DOW: pd.Series | None = None
+_HOLIDAY_DATES: np.ndarray | None = None
+_COMP_DIST_MEDIAN: float = 0.0
+_GLOBAL_MEAN: float = 0.0
+
+
+def load_history() -> None:
+    """Load the raw train data once for store aggregates and lags."""
+    global _HISTORY, _STORE_MEAN, _STORE_MEAN_DOW, _HOLIDAY_DATES
+    global _COMP_DIST_MEDIAN, _GLOBAL_MEAN
+    df = pd.read_csv(
+        RAW_TRAIN_PATH,
+        usecols=["Store", "Date", "Sales", "DayOfWeek", "Open", "StateHoliday"],
+        dtype={"StateHoliday": str},
+    )
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values(["Store", "Date"]).reset_index(drop=True)
+    _HISTORY = df
+    _STORE_MEAN = df.groupby("Store")["Sales"].mean()
+    _STORE_MEAN_DOW = df.groupby(["Store", "DayOfWeek"])["Sales"].mean()
+    _HOLIDAY_DATES = np.sort(
+        pd.to_datetime(df.loc[df["StateHoliday"] != "0", "Date"].unique())
+    )
+    _COMP_DIST_MEDIAN = float(
+        pd.read_csv(RAW_STORE_PATH, usecols=["CompetitionDistance"])[
+            "CompetitionDistance"
+        ].median()
+    )
+    _GLOBAL_MEAN = float(df["Sales"].mean())
+    logger.info("Loaded history: %d rows, %d stores", len(df), df["Store"].nunique())
+
+
+def _fill_missing_app(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill promo2 missing values (competition handled before this step)."""
+    df = df.copy()
+    df["Promo2SinceWeek"] = pd.to_numeric(df["Promo2SinceWeek"], errors="coerce").fillna(0)
+    df["Promo2SinceYear"] = pd.to_numeric(df["Promo2SinceYear"], errors="coerce").fillna(0)
+    df["PromoInterval"] = df["PromoInterval"].fillna("None")
+    return df
+
+
+def _add_holiday_proximity(df: pd.DataFrame) -> pd.DataFrame:
+    """Days to/since the nearest state holiday, from the full calendar."""
+    df = df.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    holidays = _HOLIDAY_DATES
+    if holidays is None or len(holidays) == 0:
+        df["days_to_holiday"] = 0
+        df["days_since_holiday"] = 0
+        return df
+    date_idx = np.searchsorted(holidays, df["Date"].to_numpy(), side="left")
+    date_idx = np.clip(date_idx, 0, len(holidays) - 1)
+    next_holiday = holidays[date_idx]
+    prev_holiday = holidays[np.maximum(date_idx - 1, 0)]
+    df["days_to_holiday"] = (next_holiday - df["Date"]).dt.days.clip(lower=0)
+    df["days_since_holiday"] = (df["Date"] - prev_holiday).dt.days
+    return df
+
+
+def _lag_value(hist: pd.Series, d: pd.Timestamp, n: int, fallback: float) -> float:
+    """Sales ``n`` days before ``d``, or ``fallback`` if before history."""
+    val = hist.get(d - pd.Timedelta(days=n))
+    return float(val) if pd.notna(val) else fallback
+
+
+def _rolling_value(hist: pd.Series, d: pd.Timestamp, fallback: float) -> float:
+    """Mean sales over the 7 days before ``d`` (D-7..D-1)."""
+    vals = [hist.get(d - pd.Timedelta(days=k)) for k in range(1, 8)]
+    vals = [float(v) for v in vals if pd.notna(v)]
+    return float(np.mean(vals)) if vals else fallback
+
+
+def build_features(
+    store: int,
+    pred_date: date,
+    store_type: str,
+    assortment: str,
+    state_holiday: str,
+    school_holiday: bool,
+    promo: bool,
+    competition_distance: float | None,
+    competition_open_since_month: int | None,
+    competition_open_since_year: int | None,
+    promo2: bool,
+    promo2_since_week: int | None,
+    promo2_since_year: int | None,
+    promo_interval: str,
+) -> dict[str, Any]:
+    """Build the model feature dict from raw, human-friendly inputs.
+
+    Args:
+        store: Store id (1-1115).
+        pred_date: Prediction date.
+        store_type: One of ``STORE_TYPES``.
+        assortment: One of ``ASSORTMENTS``.
+        state_holiday: One of ``STATE_HOLIDAYS`` ("0" = none).
+        school_holiday: Whether it is a school holiday.
+        promo: Whether a promo is running.
+        competition_distance: Distance to nearest competitor, or None.
+        competition_open_since_month: Month competition opened, or None.
+        competition_open_since_year: Year competition opened, or None.
+        promo2: Whether the store runs promo2.
+        promo2_since_week: ISO week promo2 started, or None.
+        promo2_since_year: Year promo2 started, or None.
+        promo_interval: One of ``PROMO_INTERVALS``.
+
+    Returns:
+        Dict of the 41 model features.
+
+    Raises:
+        RuntimeError: If history has not been loaded.
+    """
+    if _HISTORY is None:
+        raise RuntimeError("History not loaded. Call load_history() at startup.")
+
+    pred_date = pd.Timestamp(pred_date)
+    dow = int(pred_date.dayofweek) + 1  # Monday=1 ... Sunday=7
+
+    # Competition distance: blank -> missing flag + median fill.
+    if competition_distance is None:
+        comp_dist = _COMP_DIST_MEDIAN
+        comp_missing = 1
+    else:
+        comp_dist = float(competition_distance)
+        comp_missing = 0
+
+    row = pd.DataFrame(
+        [
+            {
+                "Store": int(store),
+                "Date": pred_date,
+                "DayOfWeek": dow,
+                "Promo": int(promo),
+                "SchoolHoliday": int(school_holiday),
+                "StateHoliday": state_holiday,
+                "StoreType": store_type,
+                "Assortment": assortment,
+                "CompetitionDistance": comp_dist,
+                "CompetitionDistance_missing": comp_missing,
+                "Promo2": int(promo2),
+                "Promo2SinceWeek": promo2_since_week,
+                "Promo2SinceYear": promo2_since_year,
+                "CompetitionOpenSinceMonth": competition_open_since_month,
+                "CompetitionOpenSinceYear": competition_open_since_year,
+                "PromoInterval": promo_interval,
+            }
+        ]
+    )
+
+    # Store aggregates from history.
+    store_mean = float(_STORE_MEAN.get(store, _GLOBAL_MEAN))
+    store_mean_dow = float(_STORE_MEAN_DOW.get((store, dow), store_mean))
+    row["store_mean_sales"] = store_mean
+    row["store_mean_sales_dow"] = store_mean_dow
+
+    # Lag features from history.
+    store_hist = _HISTORY.loc[_HISTORY["Store"] == store, ["Date", "Sales"]]
+    hist = store_hist.set_index("Date")["Sales"]
+    row["sales_lag_1"] = _lag_value(hist, pred_date, 1, store_mean)
+    row["sales_lag_7"] = _lag_value(hist, pred_date, 7, store_mean)
+    row["sales_rolling_7"] = _rolling_value(hist, pred_date, store_mean)
+
+    # Shared pipeline pieces (mirrors src/data/loaders.preprocess).
+    row = _fill_missing_app(row)
+    row = _add_competition_features(row)
+    row = _add_time_features(row)
+    row = _add_promo2_features(row)
+    row = _add_payday_feature(row)
+    row = _add_holiday_proximity(row)
+    row = _encode_categoricals(row)
+
+    # Ensure every expected feature exists (absent one-hots = 0).
+    for col in FEATURE_COLUMNS:
+        if col not in row.columns:
+            row[col] = 0
+    row = row[FEATURE_COLUMNS]
+    return row.iloc[0].to_dict()

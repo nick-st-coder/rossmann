@@ -1,12 +1,14 @@
 ﻿from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any
 
 import pandas as pd
 from mlflow.types import DataType
 
 from models.loader import load_model
+from src.app import features
 from src.utils.validation import validate_features
 
 logger = logging.getLogger(__name__)
@@ -26,14 +28,16 @@ _FLOAT_COLUMNS: set[str] = set()
 
 
 def load() -> None:
-    """Load the model once at startup. Fails fast on error."""
+    """Load the model and history once at startup. Fails fast on error."""
     global _MODEL, FEATURE_COLUMNS, _INT_COLUMNS, _FLOAT_COLUMNS
     _MODEL = load_model()
     names = _MODEL.metadata.signature.inputs.input_names()
     types = _MODEL.metadata.signature.inputs.input_types()
     FEATURE_COLUMNS = list(names)
+    features.FEATURE_COLUMNS = list(names)
     _INT_COLUMNS = {n for n, t in zip(names, types, strict=True) if t == DataType.long}
     _FLOAT_COLUMNS = {n for n, t in zip(names, types, strict=True) if t == DataType.double}
+    features.load_history()
     logger.info("Model loaded: %s (%d features)", _MODEL.metadata.run_id, len(FEATURE_COLUMNS))
 
 
@@ -71,3 +75,46 @@ def predict(features: dict[str, Any]) -> dict[str, float]:
     validate_features(df, FEATURE_COLUMNS)
     pred = _model().predict(df)
     return {"sales": float(pred[0])}
+
+
+def predict_raw(
+    store: int,
+    pred_date: date,
+    store_type: str,
+    assortment: str,
+    state_holiday: str,
+    school_holiday: bool,
+    promo: bool,
+    competition_distance: float | None,
+    competition_open_since_month: int | None,
+    competition_open_since_year: int | None,
+    promo2: bool,
+    promo2_since_week: int | None,
+    promo2_since_year: int | None,
+    promo_interval: str,
+) -> dict[str, float]:
+    """Predict sales from raw, human-friendly inputs.
+
+    Builds the full feature vector from the raw inputs (computing store
+    aggregates, lags, and one-hot encodings from history), then predicts.
+
+    Returns:
+        ``{"sales": <prediction>}``.
+    """
+    feats = features.build_features(
+        store=store,
+        pred_date=pred_date,
+        store_type=store_type,
+        assortment=assortment,
+        state_holiday=state_holiday,
+        school_holiday=school_holiday,
+        promo=promo,
+        competition_distance=competition_distance,
+        competition_open_since_month=competition_open_since_month,
+        competition_open_since_year=competition_open_since_year,
+        promo2=promo2,
+        promo2_since_week=promo2_since_week,
+        promo2_since_year=promo2_since_year,
+        promo_interval=promo_interval,
+    )
+    return predict(feats)
