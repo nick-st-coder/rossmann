@@ -28,14 +28,12 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy only the production assets needed to serve inference
-COPY app ./app
 COPY src ./src
-COPY config ./config
-COPY model ./model
-COPY feature_columns.txt ./feature_columns.txt
+COPY models ./models
+COPY artifacts/serving ./artifacts/serving
 
 # Expose port for FastAPI
 EXPOSE 8000
 
 # Start FastAPI using Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

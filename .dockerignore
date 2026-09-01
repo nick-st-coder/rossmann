@@ -23,3 +23,6 @@ artifacts
 *.jpg
 *.jpeg
 *.svg
+!artifacts/serving
+!artifacts/serving/*.parquet
+!artifacts/serving/meta.json
