@@ -11,6 +11,8 @@ notebook
 tests
 data
 mlartifacts
+!mlartifacts/1/models/m-82c25dbfddd54b05a64f407fe6f54a82
+!mlartifacts/1/models/m-82c25dbfddd54b05a64f407fe6f54a82/**
 docker
 artifacts
 *.ipynb
