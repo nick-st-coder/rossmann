@@ -113,7 +113,9 @@ def load_model() -> PyFuncModel:
         )
         return _load_from_local_or_raise(model_uri)
     try:
-        logger.info("Loading model from %s (tracking URI: %s)", model_uri, get_tracking_uri())
+        logger.info(
+            "Loading model from %s (tracking URI: %s)", model_uri, get_tracking_uri()
+        )
         return mlflow.pyfunc.load_model(model_uri)
     except (OSError, mlflow.MlflowException) as exc:
         logger.warning("Registry load failed (%s); trying local artifacts.", exc)

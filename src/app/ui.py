@@ -1,4 +1,4 @@
-﻿"""Gradio UI for interactively testing the Rossmann model.
+"""Gradio UI for interactively testing the Rossmann model.
 
 Uses ``gr.Blocks`` with raw, human-friendly inputs (store id, date, store
 type, promo flags, etc.) and a Predict button that calls the same
@@ -34,7 +34,9 @@ def build_ui() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column():
-                store = gr.Number(label="Store ID", value=1, minimum=1, maximum=1115, step=1)
+                store = gr.Number(
+                    label="Store ID", value=1, minimum=1, maximum=1115, step=1
+                )
                 pred_date = gr.DateTime(
                     label="Prediction Date",
                     value="2015-01-01",

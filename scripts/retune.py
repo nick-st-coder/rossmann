@@ -1,4 +1,4 @@
-﻿"""Re-tune XGBoost on a time-slice sample of all stores, then re-validate on full data.
+"""Re-tune XGBoost on a time-slice sample of all stores, then re-validate on full data.
 
 Usage:
     uv run python scripts/retune.py [--n-trials 40] [--end-date 2014-06-01]
@@ -59,7 +59,9 @@ def main() -> None:
     sample = time_slice_sample(train_open, end_date=args.end_date)
     X_sample = sample[features]
     y_sample = sample["Sales"]
-    print(f"Tuning slice: {len(sample):,} rows ({len(sample)/len(train_open):.0%} of train)")
+    print(
+        f"Tuning slice: {len(sample):,} rows ({len(sample) / len(train_open):.0%} of train)"
+    )
 
     # 2) Optuna study with pruning, logged to MLflow as nested runs.
     with start_run(
@@ -90,18 +92,31 @@ def main() -> None:
         # 3) Re-validate the winner on FULL data with the same CV scheme.
         model = train.make_model("xgboost", **best_params)
         full_scores = train.cross_validate_by_date(
-            model, X_full, y_full, train_open["Date"],
-            n_splits=args.n_splits, gap_days=args.gap_days,
+            model,
+            X_full,
+            y_full,
+            train_open["Date"],
+            n_splits=args.n_splits,
+            gap_days=args.gap_days,
         )
         full_rmsle = float(full_scores["RMSLE"].mean())
         mlflow.log_metric("full_cv_RMSLE", full_rmsle)
 
         # 4) Compare against the current default params on the same CV.
-        defaults = {"n_estimators": 300, "learning_rate": 0.05, "max_depth": 6, "random_state": 44}
+        defaults = {
+            "n_estimators": 300,
+            "learning_rate": 0.05,
+            "max_depth": 6,
+            "random_state": 44,
+        }
         default_model = train.make_model("xgboost", **defaults)
         default_scores = train.cross_validate_by_date(
-            default_model, X_full, y_full, train_open["Date"],
-            n_splits=args.n_splits, gap_days=args.gap_days,
+            default_model,
+            X_full,
+            y_full,
+            train_open["Date"],
+            n_splits=args.n_splits,
+            gap_days=args.gap_days,
         )
         default_rmsle = float(default_scores["RMSLE"].mean())
         mlflow.log_metric("default_cv_RMSLE", default_rmsle)

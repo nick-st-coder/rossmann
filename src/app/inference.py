@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 from datetime import date
@@ -36,9 +36,13 @@ def load() -> None:
     FEATURE_COLUMNS = list(names)
     features.FEATURE_COLUMNS = list(names)
     _INT_COLUMNS = {n for n, t in zip(names, types, strict=True) if t == DataType.long}
-    _FLOAT_COLUMNS = {n for n, t in zip(names, types, strict=True) if t == DataType.double}
+    _FLOAT_COLUMNS = {
+        n for n, t in zip(names, types, strict=True) if t == DataType.double
+    }
     features.load_history()
-    logger.info("Model loaded: %s (%d features)", _MODEL.metadata.run_id, len(FEATURE_COLUMNS))
+    logger.info(
+        "Model loaded: %s (%d features)", _MODEL.metadata.run_id, len(FEATURE_COLUMNS)
+    )
 
 
 def _coerce_dtypes(df: pd.DataFrame) -> pd.DataFrame:

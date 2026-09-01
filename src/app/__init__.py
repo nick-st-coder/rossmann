@@ -1,1 +1,1 @@
-﻿"""FastAPI + Gradio serving app for the Rossmann model."""
+"""FastAPI + Gradio serving app for the Rossmann model."""

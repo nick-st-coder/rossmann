@@ -149,9 +149,13 @@ def _add_promo2_features(df: pd.DataFrame) -> pd.DataFrame:
         errors="coerce",
     )
     df["promo2_age_months"] = (
-        (df["Date"].dt.year - promo2_start.dt.year) * 12
-        + (df["Date"].dt.month - promo2_start.dt.month)
-    ).fillna(0).astype(int)
+        (
+            (df["Date"].dt.year - promo2_start.dt.year) * 12
+            + (df["Date"].dt.month - promo2_start.dt.month)
+        )
+        .fillna(0)
+        .astype(int)
+    )
 
     return df
 
@@ -199,9 +203,7 @@ def _add_holiday_proximity(df: pd.DataFrame) -> pd.DataFrame:
     df["Date"] = pd.to_datetime(df["Date"])
 
     # StateHoliday is a string at this point ("0", "a", "b", "c").
-    holiday_dates = pd.to_datetime(
-        df.loc[df["StateHoliday"] != "0", "Date"].unique()
-    )
+    holiday_dates = pd.to_datetime(df.loc[df["StateHoliday"] != "0", "Date"].unique())
     holiday_dates = np.sort(holiday_dates)
 
     # Vectorized nearest-holiday search via searchsorted.
