@@ -206,6 +206,12 @@ def _add_holiday_proximity(df: pd.DataFrame) -> pd.DataFrame:
     holiday_dates = pd.to_datetime(df.loc[df["StateHoliday"] != "0", "Date"].unique())
     holiday_dates = np.sort(holiday_dates)
 
+    # No state holidays in the data -> no proximity signal; both features are 0.
+    if len(holiday_dates) == 0:
+        df["days_to_holiday"] = 0
+        df["days_since_holiday"] = 0
+        return df
+
     # Vectorized nearest-holiday search via searchsorted.
     # ``side="left"`` gives the first holiday at/after each date; dates past
     # the last holiday clamp to it, so cap the "days to" at 0 there.
