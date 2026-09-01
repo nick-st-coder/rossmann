@@ -2,6 +2,9 @@
 
 Tuning uses chronological time-series cross-validation so validation folds
 never leak future information into training.
+
+``optuna`` lives in the ``training`` dependency group, so it is imported
+lazily inside :func:`tune` — importing this module must not require it.
 """
 
 from __future__ import annotations
@@ -9,7 +12,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-import optuna
 import pandas as pd
 
 from src.models import train
@@ -45,7 +47,7 @@ def time_slice_sample(
     raise ValueError("Provide either end_date or frac.")
 
 
-def _lgbm_params(trial: optuna.Trial) -> dict[str, Any]:
+def _lgbm_params(trial: Any) -> dict[str, Any]:
     """Sample LightGBM hyperparameters from the search space."""
     return {
         "n_estimators": trial.suggest_int("n_estimators", 100, 800, step=50),
@@ -59,7 +61,7 @@ def _lgbm_params(trial: optuna.Trial) -> dict[str, Any]:
     }
 
 
-def _xgb_params(trial: optuna.Trial) -> dict[str, Any]:
+def _xgb_params(trial: Any) -> dict[str, Any]:
     """Sample XGBoost hyperparameters from the search space."""
     return {
         "n_estimators": trial.suggest_int("n_estimators", 100, 800, step=50),
@@ -72,7 +74,7 @@ def _xgb_params(trial: optuna.Trial) -> dict[str, Any]:
     }
 
 
-_PARAM_FN: dict[str, Callable[[optuna.Trial], dict[str, Any]]] = {
+_PARAM_FN: dict[str, Callable[[Any], dict[str, Any]]] = {
     "lightgbm": _lgbm_params,
     "xgboost": _xgb_params,
 }
@@ -86,9 +88,9 @@ def tune(
     n_splits: int = 5,
     gap: int = 7,
     random_state: int = 42,
-    pruner: optuna.pruners.BasePruner | None = None,
+    pruner: Any | None = None,
     log_to_mlflow: bool = False,
-) -> optuna.Study:
+) -> Any:
     """Run an Optuna study for the given model family.
 
     Args:
@@ -109,12 +111,14 @@ def tune(
     Returns:
         A completed Optuna study; ``study.best_params`` holds the winners.
     """
+    import optuna
+
     if model_name not in _PARAM_FN:
         raise ValueError(f"No search space for model_name: {model_name!r}")
 
     param_fn = _PARAM_FN[model_name]
 
-    def _objective(trial: optuna.Trial) -> float:
+    def _objective(trial: Any) -> float:
         model = train.make_model(model_name, **param_fn(trial))
         scores = train.cross_validate(model, X, y, n_splits=n_splits, gap=gap)
         score = float(scores["RMSLE"].mean())

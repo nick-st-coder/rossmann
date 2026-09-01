@@ -7,6 +7,18 @@ import pytest
 
 from src.models.tune import time_slice_sample, tune
 
+# ``optuna`` lives in the ``training`` dependency group, which the default
+# test environment doesn't install. Only the tests that run a study need it;
+# the sampling tests don't, so they always run.
+try:
+    import optuna
+except ImportError:  # pragma: no cover - depends on installed groups
+    optuna = None
+
+requires_optuna = pytest.mark.skipif(
+    optuna is None, reason="optuna not installed (training dependency group)"
+)
+
 
 @pytest.fixture
 def df() -> pd.DataFrame:
@@ -41,6 +53,7 @@ def test_time_slice_sample_requires_one_strategy(df: pd.DataFrame) -> None:
         time_slice_sample(df)
 
 
+@requires_optuna
 def test_tune_returns_study_with_best_params() -> None:
     """A tiny tuning run completes and exposes best params."""
     X = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [2.0, 4.0, 6.0, 8.0]})
@@ -50,6 +63,7 @@ def test_tune_returns_study_with_best_params() -> None:
     assert study.best_value >= 0.0
 
 
+@requires_optuna
 def test_tune_unsupported_model_raises() -> None:
     """An unknown model family raises ValueError."""
     X = pd.DataFrame({"a": [1.0, 2.0]})
