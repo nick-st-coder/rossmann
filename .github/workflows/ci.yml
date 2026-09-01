@@ -71,9 +71,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --dev
 
-      - name: Build serving artifacts
-        run: uv run python scripts/build_serving_artifacts.py
-
       - name: Load model and run smoke prediction
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
