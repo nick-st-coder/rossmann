@@ -81,7 +81,7 @@ def build_ui() -> gr.Blocks:
                 promo2 = gr.Checkbox(label="Store runs Promo 2", value=False)
                 promo2_week = gr.Number(
                     label="Promo 2 start (ISO week)",
-                    value=None,
+                    value=1,
                     minimum=1,
                     maximum=53,
                     step=1,
@@ -89,7 +89,7 @@ def build_ui() -> gr.Blocks:
                 )
                 promo2_year = gr.Number(
                     label="Promo 2 start (year)",
-                    value=None,
+                    value=2013,
                     minimum=2013,
                     maximum=2015,
                     step=1,
