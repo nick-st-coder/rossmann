@@ -21,8 +21,7 @@ app/__pycache__
 */instructions/
 */agents-documentation/
 */skills/
-*/workflows/
-.github/
+.github/copilot-instructions.md
 
 #Docker
 docker/
