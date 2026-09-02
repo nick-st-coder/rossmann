@@ -1,15 +1,18 @@
-"""Smoke-test the registered MLflow model in CI.
+"""Smoke-test the served MLflow model in CI.
 
-Loads the model from the MLflow registry and runs a small, realistic
-prediction to confirm the model loads, the tracking credentials/URI are
-present, and the prediction shape is correct. Fails fast with a clear error
-otherwise.
+Loads the model the same way the serving app does — registry first, local
+artifact fallback — and runs a small, realistic prediction to confirm the
+model loads and the prediction shape is correct. Fails fast with a clear
+error otherwise.
 
 Usage (from CI):
     uv run python scripts/validate_model.py
 
 Environment:
-    MLFLOW_TRACKING_URI  required; read from CI secrets, never hardcoded.
+    MLFLOW_TRACKING_URI  optional; if set and reachable, the registered
+                         model is validated. If unset or unreachable, the
+                         local artifact copy (what ships in the Docker
+                         image) is validated instead.
     MLFLOW_MODEL_URI     optional; defaults to ``models:/Rossmann/2``.
 """
 
@@ -18,12 +21,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import mlflow
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from models.loader import get_model_uri, get_tracking_uri
+from models.loader import get_model_uri, get_tracking_uri, load_model
 
 # A realistic single-row payload matching the model's 41-feature signature.
 SAMPLE_PAYLOAD = {
@@ -74,21 +76,22 @@ SAMPLE_PAYLOAD = {
 def main() -> None:
     """Load the model and run a smoke prediction, failing fast on error."""
     tracking_uri = get_tracking_uri()
-    if not tracking_uri:
-        raise RuntimeError("MLFLOW_TRACKING_URI is not set; cannot validate model.")
-
     model_uri = get_model_uri()
     print(f"Loading model from {model_uri} (tracking URI: {tracking_uri})")
-    model = mlflow.pyfunc.load_model(model_uri)
+    # Use the same loader as the serving app: registry first, local artifact
+    # fallback when the tracking server is unreachable (e.g. in CI).
+    model = load_model()
 
     df = pd.DataFrame([SAMPLE_PAYLOAD])
     pred = model.predict(df)
 
-    if pred.shape != (1, 1):
+    # XGBoost returns a 1-D array for a single-row prediction; accept both
+    # (1,) and (1, 1) so the check is robust to the flavor's output shape.
+    if pred.shape not in {(1,), (1, 1)}:
         raise RuntimeError(
-            f"Unexpected prediction shape {pred.shape}; expected (1, 1)."
+            f"Unexpected prediction shape {pred.shape}; expected (1,) or (1, 1)."
         )
-    value = float(pred.iloc[0, 0])
+    value = float(pred.ravel()[0])
     if value < 0:
         raise RuntimeError(f"Negative prediction {value}; expected non-negative sales.")
     print(f"Smoke prediction OK: sales = {value:.2f}")
