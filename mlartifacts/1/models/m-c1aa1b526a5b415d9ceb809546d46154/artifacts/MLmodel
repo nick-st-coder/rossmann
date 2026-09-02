@@ -1,0 +1,67 @@
+artifact_path: mlflow-artifacts:/1/models/m-c1aa1b526a5b415d9ceb809546d46154/artifacts
+env_vars:
+- POSTHOG_API_KEY
+flavors:
+  lightgbm:
+    code: null
+    data: model.skops
+    lgb_version: 4.6.0
+    model_class: lightgbm.sklearn.LGBMRegressor
+    serialization_format: skops
+    skops_trusted_types:
+    - lightgbm.basic.Booster
+    - collections.OrderedDict
+    - lightgbm.sklearn.LGBMClassifier
+    - lightgbm.sklearn.LGBMRegressor
+  python_function:
+    data: model.skops
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.lightgbm
+    python_version: 3.12.13
+is_signature_from_type_hint: false
+mlflow_version: 3.14.0
+model_id: m-c1aa1b526a5b415d9ceb809546d46154
+model_size_bytes: 5494933
+model_uuid: m-c1aa1b526a5b415d9ceb809546d46154
+prompts: null
+run_id: 5bc5c2adc19142b995e3b33168f41644
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "long", "name": "Store", "required": true}, {"type": "long",
+    "name": "DayOfWeek", "required": true}, {"type": "long", "name": "Customers",
+    "required": true}, {"type": "long", "name": "Open", "required": true}, {"type":
+    "long", "name": "Promo", "required": true}, {"type": "long", "name": "SchoolHoliday",
+    "required": true}, {"type": "double", "name": "CompetitionDistance", "required":
+    true}, {"type": "long", "name": "Promo2", "required": true}, {"type": "double",
+    "name": "Promo2SinceWeek", "required": true}, {"type": "double", "name": "Promo2SinceYear",
+    "required": true}, {"type": "long", "name": "CompetitionDistance_missing", "required":
+    true}, {"type": "double", "name": "competition_age_months", "required": true},
+    {"type": "long", "name": "has_competition", "required": true}, {"type": "long",
+    "name": "year", "required": true}, {"type": "long", "name": "month", "required":
+    true}, {"type": "long", "name": "day", "required": true}, {"type": "long", "name":
+    "week_of_year", "required": true}, {"type": "long", "name": "is_Saturday", "required":
+    true}, {"type": "long", "name": "is_Sunday", "required": true}, {"type": "double",
+    "name": "sales_lag_1", "required": true}, {"type": "double", "name": "sales_lag_7",
+    "required": true}, {"type": "double", "name": "sales_rolling_7", "required": true},
+    {"type": "long", "name": "StateHoliday_0", "required": true}, {"type": "long",
+    "name": "StateHoliday_a", "required": true}, {"type": "long", "name": "StateHoliday_b",
+    "required": true}, {"type": "long", "name": "StateHoliday_c", "required": true},
+    {"type": "long", "name": "StoreType_a", "required": true}, {"type": "long", "name":
+    "StoreType_b", "required": true}, {"type": "long", "name": "StoreType_c", "required":
+    true}, {"type": "long", "name": "StoreType_d", "required": true}, {"type": "long",
+    "name": "Assortment_a", "required": true}, {"type": "long", "name": "Assortment_b",
+    "required": true}, {"type": "long", "name": "Assortment_c", "required": true},
+    {"type": "long", "name": "PromoInterval_Feb_May_Aug_Nov", "required": true}, {"type":
+    "long", "name": "PromoInterval_Jan_Apr_Jul_Oct", "required": true}, {"type": "long",
+    "name": "PromoInterval_Mar_Jun_Sept_Dec", "required": true}, {"type": "long",
+    "name": "PromoInterval_None", "required": true}]'
+  outputs: '[{"type": "double", "required": true}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-08-28 09:53:38.290020'
